@@ -13,16 +13,22 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      selectInput("projectFilter", "Filter by Project:",
-                  choices = NULL, multiple = TRUE),
-      selectInput("fieldFilter", "Filter by Field:",
-                  choices = NULL, multiple = TRUE),
-      selectInput("institutionFilter", "Filter by Institution:",
-                  choices = NULL, multiple = TRUE),
-      sliderInput("yearRange", "Year Range:",
-                  min = 2000, max = 2024,
-                  value = c(2000, 2024)),
-      actionButton("resetFilters", "Reset Filters")
+      # Color coding selection
+      selectInput("colorBy", "Color nodes by:",
+                  choices = c("Institution" = "organization",
+                              "Field" = "main_field",
+                              "Project" = "TPM_project",
+                              "Member Type" = "group"),
+                  selected = "organization"),
+      
+      # Minimum collaboration filter
+      sliderInput("minCollabs", "Minimum number of collaborations:",
+                  min = 1, max = 10, value = 2, step = 1),
+      
+      # Show external collaborators toggle
+      checkboxInput("showExternal", "Show External Collaborators", TRUE),
+      
+      width = 3
     ),
     
     mainPanel(
@@ -31,11 +37,11 @@ ui <- fluidPage(
         style = "margin-top: 20px",
         h4("Network Statistics"),
         verbatimTextOutput("networkStats")
-      )
+      ),
+      width = 9
     )
   )
 )
-
 
 # Run the app
 #shinyApp(ui = ui, server = server)
