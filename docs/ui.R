@@ -6,6 +6,7 @@ library(tidyr)
 library(stringr)
 library(igraph)
 library(purrr)
+library(stringdist)
 
 # UI Definition
 ui <- fluidPage(
