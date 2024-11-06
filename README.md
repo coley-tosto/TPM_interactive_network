@@ -1,4 +1,4 @@
-# Interactive Network for the Te Pūnaha Matatini Group
+# Interactive Network for Te Pūnaha Matatini
 This group is comprised on individuals from a wide variety of backgrounds who are all interested in understanding **complex** systems. They bring together researchers from tertiary institutions, government institutes, provate sector organizations, and marae communities from all throughout Aotearoa New Zeland. You can read more about this incredible group [here](https://www.tepunahamatatini.ac.nz/)
 
 This repository contains code related to a ShinyApp which attempts to visualize how this huge diversity of individuals comes together in collaboration. 
