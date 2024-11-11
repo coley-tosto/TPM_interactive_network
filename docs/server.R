@@ -34,81 +34,6 @@ standardize_name <- function(name) {
 }
 
 
-# Function to read the words from the title of a piece of work
-get_title <- function(x){
-  
-  ## Separate title into the separate words
-  x <- unlist(strsplit(x, " "))
-  
-  ## Remove unnecessary symbols (: and ,)
-  x <- unlist(strsplit(x, ":"))
-  x <- unlist(strsplit(as.character(x), ","))
-  
-  ## Remove words that have fewer than 4 letters (and, or, then, etc.)
-  x <- x[nchar(x) > 4]
-  
-  ## Remove weird formatting from Zotero style
-  exclude_letters <- "<span|style=|span>|<i|i>"
-  x <- x[!grepl(exclude_letters, x)]
-  
-  ## Collapse filtered words into a list separated by a ";"
-  paste(x, collapse = "; ")
-  
-}
-
-
-# Function to extract main field based on keywords extracted from the titles
-get_main_field <- function(keywords) {
-  
-  ## Combine all of the titles together, remove ; and spaces and convert
-  ## all titles to lower case for consistency
-  x <- unlist(strsplit(paste(keywords, collapse = ";"), ";"))
-  x <- unlist(strsplit(x, " "))
-  x <- tolower(x[nchar(x) > 1])
-  
-  ## IF the combined titles are longer than a single word, do this:
-  if(length(x) > 1){
-    
-    # Ensure that words which are very similar are counted as the same
-    # (i.e., "modelling" and "modeling")
-    
-    ## Calculate the string distance matrix
-    dist_matrix <- stringdistmatrix(x, x, method = "jw")  # Jaro-Winkler method works well for short words
-  
-    ## Cluster words based on similarity - adjust `h` (height) for clustering threshold
-    clusters <- cutree(hclust(as.dist(dist_matrix)), 
-                       h = 0.2)  # Lower h for stricter similarity
-  
-    ## Assign each word to its cluster representative
-    clustered_words <- sapply(unique(clusters), 
-                              function(i) x[clusters == i][1])
-  
-    ## Replace words with their cluster representative and count them
-    clustered_words_vector <- clustered_words[match(clusters, unique(clusters))]
-    keyword_counts <- table(clustered_words_vector)
-    
-    # Pull out the word with the highest frequency
-    main_word <- names(keyword_counts[keyword_counts == max(keyword_counts)])
-  
-    # Account for multiple words with the same frequency
-    if(length(main_word) > 1){
-    
-      paste(main_word[2])
-      
-      }else{
-        
-        paste(main_word)
-        
-      }
-    }else{
-      
-      #If the collection of title words = 1, paste that word
-      paste(x[1])
-      
-    }
-}
-
-
 # Function to get unique color palette for any number of categories
 get_color_palette <- function(n) {
   
@@ -168,15 +93,11 @@ server <- function(input, output, session) {
       unnest(authors) %>%
       
       # Using the "standardize_name" function to ensure names have same format
-      # Using the "get_title" function separate/filter words from titles
       mutate(author_std = sapply(authors, standardize_name)) %>%
-      mutate(title_words = sapply(Title, get_title)) %>% 
       group_by(author_std) %>%
       
-      # Counts the number of collaborations for each author and categorizes field
-      summarise(n_collaborations = n(), 
-                main_field = get_main_field(title_words),
-                Item.Type = first(Item.Type)) #Include what type
+      # Counts the number of collaborations for each author 
+      summarise(n_collaborations = n())
     
     
     ## Create edges from co-authorship
@@ -224,15 +145,11 @@ server <- function(input, output, session) {
              font.size = 30,  # Increase label font size
              borderWidth = ifelse(is_tpm, 3, 1), # Increased border for TPM members
              organization = ifelse(is.na(organization), "Unknown", organization),
-             main_field = ifelse(is.na(main_field), "Unknown", main_field),
              TPM_project = ifelse(is.na(TPM_project), "None", TPM_project),
-             Item.Type = ifelse(is.na(Item.Type), "Unknown", Item.Type),
-             title = sprintf("<p><b>%s</b><br>Field: %s<br>Institution: %s<br>Project: %s<br>Type: %s<br>Collaborations: %d<br>Status: %s</p>",
+             title = sprintf("<p><b>%s</b><br>Institution: %s<br>Project: %s<br>Collaborations: %d<br>Status: %s</p>",
                              author_std, 
-                             main_field,
                              organization,
                              TPM_project,
-                             Item.Type,
                              n_collaborations,
                              ifelse(is_tpm, "TPM Member", "External Collaborator"))
              )

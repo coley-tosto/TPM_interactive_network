@@ -32,10 +32,8 @@ ui <- fluidPage(
       # Color coding selection
       selectInput("colorBy", "Color nodes by:",
                   choices = c("Institution" = "organization",
-                              "Field" = "main_field",
                               "Project" = "TPM_project",
-                              "Member Type" = "group",
-                              "Publication Type" = "Item.Type"),
+                              "Member Type" = "group"),
                   selected = "organization"),
       
       # Minimum collaboration filter
