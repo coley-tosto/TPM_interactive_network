@@ -14,12 +14,28 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
+      
+      # File upload inputs
+      fileInput("zoteroData", "Upload Zotero Data (CSV)",
+                accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
+      fileInput("projectData", "Upload Project Data (CSV)",
+                accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
+      
+      # Year filter
+      sliderInput("yearRange", "Filter by Year:",
+                  min = 2015, max = as.numeric(format(Sys.Date(), "%Y")), value = c(2021, 2024), step = 1),
+      
+      # Search box for specific people
+      textInput("searchPerson", "Search for a researcher:",
+                placeholder = "Enter name..."),
+      
       # Color coding selection
       selectInput("colorBy", "Color nodes by:",
                   choices = c("Institution" = "organization",
                               "Field" = "main_field",
                               "Project" = "TPM_project",
-                              "Member Type" = "group"),
+                              "Member Type" = "group",
+                              "Publication Type" = "Item.Type"),
                   selected = "organization"),
       
       # Minimum collaboration filter
