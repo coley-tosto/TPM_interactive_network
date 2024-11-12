@@ -160,7 +160,7 @@ server <- function(input, output, session) {
     })
   
 
-    
+  # Creating the network  
   output$network <- renderVisNetwork({
     req(network_data())
     
@@ -310,10 +310,13 @@ server <- function(input, output, session) {
     
   })
   
-  # Network statistics
-  output$networkStats <- renderPrint({
+  # Network summary Tabs
+  # Overall Summary Statistics
+  output$networkSummaryStats <- renderUI({
+    
     req(network_data())
     
+    ## Get the filtered network data
     filtered_edges <- network_data()$edges %>%
       filter(weight >= input$minCollabs)
     
@@ -323,21 +326,130 @@ server <- function(input, output, session) {
       filter(id %in% connected_nodes,
              (input$showExternal | group == "TPM Member"))
     
+    ## Create igraph object for the network analysis
     g <- graph_from_data_frame(filtered_edges, vertices = filtered_nodes$id)
     
-    cat("Network Summary:\n")
-    cat("Number of Researchers:", vcount(g), "\n")
-    cat("Number of Collaborations:", ecount(g), "\n")
-    cat("Network Density:", round(edge_density(g), 4), "\n")
-    cat("Average Degree:", round(mean(degree(g)), 2), "\n")
-    cat("\nMost Connected Researchers:\n")
+    ## Calculate the TPM-specific metrics
+    # Subsetting filtered nodes and edges for TPM-TPM collaborations
+    tpm_nodes <- filtered_nodes %>% 
+      filter(group == "TPM Member")
+    
+    tpm_edges <- filtered_edges %>% 
+      filter(from %in% tpm_nodes$id & to %in% tpm_nodes$id)
+    
+    # Calculate the TPM-specific average degree
+    tpm_degrees <- degree(g)[tpm_nodes$id]
+    tpm_avg_degree <- mean(tpm_degrees)
+    
+    ## Paste summary statistics
+    HTML(paste("<div style='padding: 15px; font-size: 16px;'>",
+               "<h3 style='font-size: 24px;'>Researcher Statistics</h3>",
+               "<p style='margin-left: 20px;'><strong>Total Researchers:</strong> ", vcount(g), "</p>",
+               "<p style='margin-left: 20px;'><strong>TPM Members:</strong> ", nrow(tpm_nodes), "</p>",
+               "<p style='margin-left: 20px;'><strong>External Collaborators:</strong> ", vcount(g) - nrow(tpm_nodes), "</p>",
+      
+               "<h3 style='font-size: 24px;'>Collaboration Statistics</h3>",
+               "<p style='margin-left: 20px;'><strong>Total Collaborations:</strong> ", ecount(g), "</p>",
+               "<p style='margin-left: 20px;'><strong>TPM Internal Collaborations:</strong> ", nrow(tpm_edges), "</p>",
+               "<p style='margin-left: 20px;'><strong>External Collaborations:</strong> ", ecount(g) - nrow(tpm_edges), "</p>",
+      
+               "<h3 style='font-size: 24px;'>Network Metrics</h3>",
+               "<p style='margin-left: 20px;'><strong>Overall Average Degree:</strong> ", round(mean(degree(g)), 2), "</p>",
+               "<p style='margin-left: 20px;'><strong>TPM Average Degree:</strong> ", round(tpm_avg_degree, 2), "</p>",
+               "</div>")
+         )
+  })
+  
+  
+  # Summary of Publication Types
+  output$publicationStats <- renderUI({
+    
+    req(network_data())
+    
+    ## Calculate the publication type statistics
+    pub_stats <- data_store$zotero_data %>%
+      
+      filter(Publication.Year >= input$yearRange[1],
+             Publication.Year <= input$yearRange[2]) %>%
+      
+      group_by(Item.Type) %>%
+      summarise(Count = n(), .groups = 'drop') %>%
+      
+      arrange(desc(Count))
+    
+    ## Create the HTML table
+    table_rows <- apply(pub_stats, 1, function(row) {
+      
+      paste0("<tr><td style='padding: 8px;'>", row["Item.Type"], "</td>",
+             "<td style='padding: 8px; text-align: right;'>", row["Count"], "</td></tr>")
+      
+      })
+    
+    HTML(paste("<div style='padding: 15px;'>",
+               "<h3 style='font-size: 24px;'>Publication Types</h3>",
+               "<table class='table' style='width: 50%; margin-top: 15px; font-size: 16px;'>",
+               "<thead><tr><th style='padding: 8px;'>Type</th><th style='padding: 8px; text-align: right;'>Count</th></tr></thead>",
+               "<tbody>",
+               paste(table_rows, collapse = ""),
+               "</tbody>",
+               "</table>",
+               "</div>")
+         )
+  })
+  
+  
+  # Summary of the most connected TPM Researchers
+  output$researcherStats <- renderUI({
+    
+    req(network_data())
+    
+    ## Get the filtered network data
+    filtered_edges <- network_data()$edges %>%
+      filter(weight >= input$minCollabs)
+    
+    connected_nodes <- unique(c(filtered_edges$from, filtered_edges$to))
+    
+    filtered_nodes <- network_data()$nodes %>%
+      filter(id %in% connected_nodes,
+             (input$showExternal | group == "TPM Member"))
+    
+    ## Create igraph object for network analysis
+    g <- graph_from_data_frame(filtered_edges, 
+                               vertices = filtered_nodes$id)
+    
+    ## Calculate degrees for TPM members only
     degree_table <- data.frame(Researcher = names(degree(g)),
                                Connections = degree(g)) %>%
       
-      arrange(desc(Connections)) %>%
+      # Join with filtered_nodes to get group information
+      left_join(filtered_nodes %>% select(id, group),
+                by = c("Researcher" = "id")) %>%
       
-      head(5)
+      # Filter for TPM members only
+      filter(group == "TPM Member") %>%
+      
+      # Select and arrange
+      select(Researcher, Connections) %>%
+      arrange(desc(Connections)) %>%
+      head(10)
     
-    print(degree_table)
+    ## Create the HTML table
+    table_rows <- apply(degree_table, 1, function(row) {
+      
+      paste0("<tr><td style='padding: 8px;'>", row["Researcher"], "</td>",
+             "<td style='padding: 8px; text-align: right;'>", row["Connections"], "</td></tr>")
+      
+    })
+    
+    HTML(paste("<div style='padding: 15px;'>",
+               "<h3 style='font-size: 24px;'>Most Connected TPM Researchers</h3>",
+               "<table class='table' style='width: 50%; margin-top: 15px; font-size: 16px;'>",
+               "<thead><tr><th style='padding: 8px;'>Researcher</th><th style='padding: 8px; text-align: right;'>Connections</th></tr></thead>",
+               "<tbody>",
+               paste(table_rows, collapse = ""),
+               "</tbody>",
+               "</table>",
+               "</div>")
+         )
   })
 }

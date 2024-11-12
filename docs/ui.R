@@ -10,11 +10,12 @@ library(stringdist)
 
 # UI Definition
 ui <- fluidPage(
+  
   titlePanel("Research Collaboration Network"),
   
   sidebarLayout(
     sidebarPanel(
-      
+
       # File upload inputs
       fileInput("zoteroData", "Upload Zotero Data (CSV)",
                 accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
@@ -44,19 +45,23 @@ ui <- fluidPage(
       checkboxInput("showExternal", "Show External Collaborators", TRUE),
       
       width = 3
+      
     ),
     
     mainPanel(
+      
       visNetworkOutput("network", height = "800px"),
-      div(
-        style = "margin-top: 20px",
-        h4("Network Statistics"),
-        verbatimTextOutput("networkStats")
-      ),
-      width = 9
+      
+      div(style = "margin-top: 20px",
+          tabsetPanel(id = "statsTabs",
+                      tabPanel("Network Summary",
+                               htmlOutput("networkSummaryStats")),
+                      tabPanel("Publication Types",
+                               htmlOutput("publicationStats")),
+                      tabPanel("Researchers",
+                               htmlOutput("researcherStats")))
+          ),
+      
+      width = 9)
     )
   )
-)
-
-# Run the app
-#shinyApp(ui = ui, server = server)
