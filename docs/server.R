@@ -45,44 +45,21 @@ get_color_palette <- function(n) {
 # Server logic
 server <- function(input, output, session) {
   
-  # Reactive values to store uploaded data and processed network
-  data_store <- reactiveValues(zotero_data = NULL,
-                               project_data = NULL)
-    
   network_data <- reactiveVal()
     
-  # Handle file uploads
-  observeEvent(input$zoteroData, {
-      
-    data_store$zotero_data <- read.csv(input$zoteroData$datapath, 
-                                       stringsAsFactors = FALSE)
-      
-    })
-    
-  observeEvent(input$projectData, {
-      
-    data_store$project_data <- read.csv(input$projectData$datapath, 
-                                        stringsAsFactors = FALSE,
-                                        fileEncoding = "latin1")
-      
-  })
-  
-  # Process data when both files are uploaded
+  # Load and process the data
   observe({
     
-    req(data_store$zotero_data, data_store$project_data)
+    ##Read in the Zotero data and the project data from a google drive location
+    zotero_data <- drive_get("zotero_data") %>% 
+      read_sheet()
     
-    zotero_data <- data_store$zotero_data
-    project_data <- data_store$project_data
+    project_data <- drive_get("project_data") %>% 
+      read_sheet()
     
-    ## Filter by year if the Year column exists
-    
-    if("Publication.Year" %in% colnames(zotero_data)) {
-      
-      zotero_data <- zotero_data %>%
-        filter(Publication.Year >= input$yearRange[1] & Publication.Year <= input$yearRange[2])
-      
-    }
+    ## Update the choices in the researcher selection dropdown menu
+    updateSelectInput(session, "searchPerson",
+                      choices = c("", sort(unique(project_data$stand_name)))) #Sorts names by alphabetical order
     
     
     ## Process Zotero data to create collaboration network
@@ -145,11 +122,11 @@ server <- function(input, output, session) {
              font.size = 30,  # Increase label font size
              borderWidth = ifelse(is_tpm, 3, 1), # Increased border for TPM members
              organization = ifelse(is.na(organization), "Unknown", organization),
-             TPM_project = ifelse(is.na(TPM_project), "None", TPM_project),
-             title = sprintf("<p><b>%s</b><br>Institution: %s<br>Project: %s<br>Collaborations: %d<br>Status: %s</p>",
+             department = ifelse(is.na(department), "Unknown", department),
+             title = sprintf("<p><b>%s</b><br>Institution: %s<br>Department: %s<br>Collaborations: %d<br>Status: %s</p>",
                              author_std, 
                              organization,
-                             TPM_project,
+                             department,
                              n_collaborations,
                              ifelse(is_tpm, "TPM Member", "External Collaborator"))
              )
@@ -162,6 +139,9 @@ server <- function(input, output, session) {
 
   # Creating the network  
   output$network <- renderVisNetwork({
+    
+    ## Perform a check to ensure all of the dataset filter/building has worked
+    ## If problem, no network will show
     req(network_data())
     
     ## Filter based on minimum collaborations
@@ -186,88 +166,21 @@ server <- function(input, output, session) {
              borderWidth = ifelse(group == "TPM Member", 3, 1),
              font.size = 30)
     
-    ## Apply search filter if provided
-    if (!is.null(input$searchPerson) && nchar(trimws(input$searchPerson)) > 0) {
-      
-      search_pattern <- tolower(trimws(input$searchPerson))
-      
-      # Find matching nodes
-      matching_nodes <- filtered_nodes$id[grepl(search_pattern, 
-                                                tolower(filtered_nodes$id), 
-                                                fixed = TRUE)]
-      
-      
-      if(length(matching_nodes) > 0) {
-        
-        ## Find connected nodes (1 degree of separation)
-        connected_to_matches <- filtered_edges %>%
-          
-          filter(from %in% matching_nodes | to %in% matching_nodes) %>%
-          gather(key, value, from:to) %>%
-          
-          pull(value) %>%
-          unique()
-        
-        ## Update node properties based on search and connections
-        filtered_nodes <- filtered_nodes %>%
-          
-          mutate(isMatch = id %in% matching_nodes,
-                 isConnected = id %in% connected_to_matches & !isMatch,
-                 
-                 # Show labels for matching and connected nodes
-                 label = case_when(isMatch ~ id,
-                                   isConnected ~ id,
-                                   TRUE ~ label),
-                 
-                 # Visual properties for matching nodes
-                 borderWidth = case_when(isMatch ~ 8,
-                                         isConnected ~ 4,
-                                         TRUE ~ borderWidth),
-                 
-                 font.size = case_when(isMatch ~ 45,
-                                       isConnected ~ 35,
-                                       TRUE ~ font.size),
-                 
-                 opacity = case_when(isMatch ~ 1,
-                                     isConnected ~ 0.8,
-                                     TRUE ~ 0.2),
-                 
-                 shadow = isMatch)
-        
-        # Update edge properties
-        filtered_edges <- filtered_edges %>%
-          
-          mutate(isHighlighted = (from %in% matching_nodes | to %in% matching_nodes),
-                 width = case_when(isHighlighted ~ width * 2,
-                                   TRUE ~ width),
-                 opacity = case_when(isHighlighted ~ 1,
-                                     TRUE ~ 0.2),
-                 color = case_when(isHighlighted ~ "#ff3333",  # Bright red for highlighted connections
-                                   TRUE ~ "#848484"  # Gray for other connections
-                                   )
-          )
-        }
-    }
-    
-
     ## Get unique values for the selected grouping variable and generate the 
     ## color palette
     unique_values <- unique(filtered_nodes[[input$colorBy]])
     color_palette <- get_color_palette(length(unique_values))
     
-    # Create color mapping and update the node colors based on the selected
-    # variable
+    ## Create color mapping and update the node colors based on the selected
+    ## variable
     color_mapping <- setNames(color_palette, unique_values)
     filtered_nodes$color <- color_mapping[filtered_nodes[[input$colorBy]]]
     
-    # Modify colors for matching nodes if search is active
-    if (!is.null(input$searchPerson) && nchar(trimws(input$searchPerson)) > 0 && length(matching_nodes) > 0) {
-      filtered_nodes <- filtered_nodes %>%
-        mutate(color = case_when(isMatch ~ "#ff3333",  # Bright red for matches
-                                 isConnected ~ color,   # Keep category color for connected nodes
-                                 TRUE ~ color))          # Keep category color for others
-    }
-    
+    ## Build the legend based off the color mapping data
+    legend_data <- data.frame(label = names(color_mapping),
+                              color = unname(color_mapping),
+                              shape = "dot")
+
     
     ## Create network visualization
     visNetwork(filtered_nodes, filtered_edges, width = "100%", height = "800px") %>%
@@ -295,25 +208,75 @@ server <- function(input, output, session) {
       
       visLayout(randomSeed = 123) %>% 
       
-      visLegend(addNodes = data.frame(label = names(color_mapping),
-                                      color = color_mapping,
-                                      shape = "dot"), 
+      visLegend(addNodes = legend_data, 
                 useGroups = FALSE) %>%
       
-      visEvents(click = "function(nodes) {if (nodes.nodes.length > 0) {
-          this.fit({
-            nodes: [nodes.nodes[0]],
-            animation: true
-          });
+      #visEvents(click = "function(nodes) {if (nodes.nodes.length > 0) {
+       #   this.fit({
+       #     nodes: [nodes.nodes[0]],
+       #     animation: true
+       #   });
+       # }
+      #}")
+      
+      visEvents(
+        selectNode = "function(nodes) {
+        // Check if a node is selected
+        if (nodes.nodes.length > 0) {
+          var selectedNode = nodes.nodes[0];
+          
+          // Log the selected node to the browser console
+          console.log('Selected node:', selectedNode);
+          
+          // Attempt to update Shiny input
+          Shiny.setInputValue('searchPerson', selectedNode);
         }
-      }")
-    
+      },
+        // Add a click event for additional debugging
+        click = function(params) {
+        console.log('Click event:', params);
+      }"
+      )
   })
+  
+  # Observe the searchPerson input and trigger node selection
+  observeEvent(input$searchPerson, {
+    # Log the selected person to R console
+    print(paste("Selected person:", input$searchPerson))
+    
+    # Use shinyjs to run JavaScript
+    js <- sprintf("
+    var network = document.getElementById('network').network;
+    var nodeId = '%s';
+    console.log('Trying to select node:', nodeId);
+    
+    // Check if the node exists
+    var nodeExists = network.body.data.nodes.get({
+      filter: function(node) {
+        return node.id === nodeId;
+      }
+    });
+    
+    if (nodeExists.length > 0) {
+      network.selectNodes([nodeId], true);
+      network.fit({
+        nodes: [nodeId],
+        animation: true
+      });
+      console.log('Node selected successfully');
+    } else {
+      console.log('Node not found:', nodeId);
+    }
+  ", input$searchPerson)
+    
+    runjs(js)
+  }, ignoreNULL = TRUE)
   
   # Network summary Tabs
   # Overall Summary Statistics
   output$networkSummaryStats <- renderUI({
     
+    ## Perform a check to ensure all of the previous steps have worked
     req(network_data())
     
     ## Get the filtered network data
