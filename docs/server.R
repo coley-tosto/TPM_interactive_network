@@ -2,14 +2,14 @@
 #shiny_token <- googlesheets4::gs4_auth() # authenticate w/ your desired Google identity here
 #saveRDS(shiny_token, "shiny_app_token.rds")
 # 
- googlesheets4::gs4_auth(
-  email = "nicole.tosto@gmail.com",
-  path = NULL,
-  scopes = "https://www.googleapis.com/auth/spreadsheets",
-  cache = gargle::gargle_oauth_cache(),
-  use_oob = TRUE,
-  token = "shiny_app_token.rds"
- )
+ #googlesheets4::gs4_auth(
+  #email = "nicole.tosto@gmail.com",
+  #path = NULL,
+  #scopes = "https://www.googleapis.com/auth/spreadsheets",
+  #cache = gargle::gargle_oauth_cache(),
+  #use_oob = TRUE,
+  #token = "shiny_app_token.rds"
+ #)
 
 # Function to standardize author names from Zotero formatting
 standardize_name <- function(name) {
@@ -69,12 +69,22 @@ server <- function(input, output, session) {
     ## Read in the chosen "collaboration" dataset and the TPM metadata from a google drive location
     ## Currently using Scopus as the "collaboration" data
     ##Storing the Scopus data for use later on
-    collaboration_data <- as.data.frame(read_sheet("https://docs.google.com/spreadsheets/d/1Fhy4H1UnlGDqO6TaKH_q89_fvYsyINNgp7bDViPUV2I/edit?usp=sharing"))
+    #collaboration_data <- as.data.frame(read_sheet("https://docs.google.com/spreadsheets/d/1Fhy4H1UnlGDqO6TaKH_q89_fvYsyINNgp7bDViPUV2I/edit?usp=sharing"))
+    collaboration_data <- read.csv(url("https://raw.githubusercontent.com/coley-tosto/TPM_interactive_network/refs/heads/main/data/scopus.csv"))
     data_store$collaboration_data <- collaboration_data
     
-    metadata <- as.data.frame(read_sheet("https://docs.google.com/spreadsheets/d/16v69T6f9hc7dA8XKZTcECsftq5chI90um0AZP0KtDIo/edit?usp=sharing"))
+    #metadata <- as.data.frame(read_sheet("https://docs.google.com/spreadsheets/d/16v69T6f9hc7dA8XKZTcECsftq5chI90um0AZP0KtDIo/edit?usp=sharing"))
+    metadata <- read.csv(url('https://raw.githubusercontent.com/coley-tosto/TPM_interactive_network/refs/heads/main/data/project_data.csv'),
+                         header=FALSE, 
+                         stringsAsFactors=FALSE, fileEncoding="latin1")
     
-    ## Filter by year if the Year column exists
+    colnames(metadata) <- c("first_name", "last_name", "stand_name", "organization",
+                            "department", "TPM_role", "TPM_category", "TPM_inq_com", "TPM_project",
+                            "year_joined", "TPM_bio", "ORCID_ID", "Scopus_ID")
+    
+    metadata <- metadata[-1, ]
+    
+      ## Filter by year if the Year column exists
     
     if("Year" %in% colnames(collaboration_data)) {
       
@@ -158,14 +168,20 @@ server <- function(input, output, session) {
     
     #Read-in the the Overton data generated from a list of "authors"
     #Filter to keep only unique instances (by "Matched DOI")
-    overton_authors <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1L5ed2LgBde8cp7fjUPkM71SewzZMAL5A6b3q1c7NvOg/edit?usp=sharing')) %>%
-      distinct(`Matched DOI`, .keep_all = TRUE)
+    #overton_authors <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1L5ed2LgBde8cp7fjUPkM71SewzZMAL5A6b3q1c7NvOg/edit?usp=sharing')) %>%
+      #distinct(`Matched DOI`, .keep_all = TRUE)
+    
+    overton_authors <- read.csv(url('https://raw.githubusercontent.com/coley-tosto/TPM_interactive_network/refs/heads/main/data/overton_authors.csv')) %>% 
+      distinct(Matched.DOI, .keep_all = TRUE)
     
     #Read-in the Overton data generated with a keyword search
     #Filter to keep only unique instances (by "Policy Document ID")
-    overton_keywords <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1oUdaN45vFKcvvoJ7BOWerAYaYasjTCmbbUiAgmVEI_k/edit?usp=sharing',
-                                                 sheet = "Matched references")) %>% 
-      distinct(`Policy Document ID`, .keep_all = TRUE)
+    #overton_keywords <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1oUdaN45vFKcvvoJ7BOWerAYaYasjTCmbbUiAgmVEI_k/edit?usp=sharing',
+      #                                           sheet = "Matched references")) %>% 
+      #distinct(`Policy Document ID`, .keep_all = TRUE)
+    
+    overton_keywords <- read.csv(url('https://raw.githubusercontent.com/coley-tosto/TPM_interactive_network/refs/heads/main/data/overton_keywords.csv')) %>% 
+      distinct(Policy.Document.ID, .keep_all = TRUE)
     
     #Store Overton data for use later
     data_store$overton_authors <- overton_authors
