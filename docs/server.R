@@ -156,6 +156,22 @@ server <- function(input, output, session) {
     # Store processed network data
     network_data(list(nodes = nodes, edges = edges))
     
+    #Read-in the the Overton data generated from a list of "authors"
+    #Filter to keep only unique instances (by "Matched DOI")
+    overton_authors <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1L5ed2LgBde8cp7fjUPkM71SewzZMAL5A6b3q1c7NvOg/edit?usp=sharing')) %>%
+      distinct(`Matched DOI`, .keep_all = TRUE)
+    
+    #Read-in the Overton data generated with a keyword search
+    #Filter to keep only unique instances (by "Policy Document ID")
+    overton_keywords <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1oUdaN45vFKcvvoJ7BOWerAYaYasjTCmbbUiAgmVEI_k/edit?usp=sharing',
+                                                 sheet = "Matched references")) %>% 
+      distinct(`Policy Document ID`, .keep_all = TRUE)
+    
+    #Store Overton data for use later
+    data_store$overton_authors <- overton_authors
+    data_store$overton_keywords <- overton_keywords
+    
+    
     })
   
 
@@ -383,6 +399,33 @@ server <- function(input, output, session) {
                paste(table_rows, collapse = ""),
                "</tbody>",
                "</table>",
+               "</div>")
+         )
+  # Summary of Overton Statistics
+  output$overtonStats <- renderUI({
+    
+    req(network_data())
+    
+    ## Filter the overton stats for the specified years
+    overton_authors_stats <- data_store$overton_authors %>%
+      
+      mutate(publication_year = as.numeric(format(as.Date(Published), "%Y"))) %>% 
+      
+      filter(publication_year >= input$yearRange[1],
+             publication_year <= input$yearRange[2])
+    
+    overton_keywords_stats <- data_store$overton_keywords %>% 
+      
+      mutate(publication_year = as.numeric(format(as.Date(Published), "%Y"))) %>% 
+      
+      filter(publication_year >= input$yearRange[1],
+             publication_year <= input$yearRange[2])
+    
+    ## Create summary of the stats
+    HTML(paste("<div style='padding: 15px; font-size: 16px;'>",
+               "<h3 style='font-size: 24px;'>Te Pūnaha Matatini's reach in Policy Documents</h3>",
+               "<p style='margin-left: 20px;'><strong>Number of times a TPM Member's work is cited:</strong> ", nrow(overton_authors_stats), "</p>",
+               "<p style='margin-left: 20px;'><strong>Number of times Te Pūnaha Matatini is mentioned:</strong> ", nrow(overton_keywords_stats), "</p>",
                "</div>")
          )
   })
