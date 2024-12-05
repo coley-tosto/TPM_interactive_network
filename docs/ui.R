@@ -7,20 +7,17 @@ library(stringr)
 library(igraph)
 library(purrr)
 library(stringdist)
-library(googledrive)
 library(googlesheets4)
-library(shinyjs)
 
 # UI Definition
+# UI Definition
 ui <- fluidPage(
-  
-  useShinyjs(),
   
   titlePanel("Research Collaboration Network"),
   
   sidebarLayout(
     sidebarPanel(
-
+      
       # Year filter
       sliderInput("yearRange", "Filter by Year:",
                   min = 2015, 
@@ -29,14 +26,12 @@ ui <- fluidPage(
                   step = 1,
                   sep = ""),
       
-      # Select for specific people
-      selectInput("searchPerson", "Select a researcher:",
-                  choices = NULL), ##The choices will be populated in the server
       
       # Color coding selection (How do you want the nodes to be colored by?)
       selectInput("colorBy", "Color nodes by:",
                   choices = c("Institution" = "organization",
                               "Department" = "department",
+                              "TPM Memeber" = "person",
                               "Member Type" = "group"),
                   selected = "organization"),
       
@@ -63,8 +58,8 @@ ui <- fluidPage(
                                htmlOutput("publicationStats")),
                       tabPanel("Researchers",
                                htmlOutput("researcherStats")))
-          ),
+      ),
       
       width = 9)
-    )
   )
+)

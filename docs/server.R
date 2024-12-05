@@ -1,3 +1,16 @@
+# to setup googlesheet auth (comment out once done) -----------------------------------
+#shiny_token <- googlesheets4::gs4_auth() # authenticate w/ your desired Google identity here
+#saveRDS(shiny_token, "shiny_app_token.rds")
+# 
+# googlesheets4::gs4_auth(
+#  email = "nicole.tosto@gmail.com",
+#  path = NULL,
+#  scopes = "https://www.googleapis.com/auth/spreadsheets",
+#  cache = gargle::gargle_oauth_cache(),
+#  use_oob = TRUE,
+#  token = "shiny_app_token.rds"
+# )
+
 # Function to standardize author names from Zotero formatting
 standardize_name <- function(name) {
   
@@ -51,15 +64,13 @@ server <- function(input, output, session) {
   observe({
     
     ##Read in the Zotero data and the project data from a google drive location
-    zotero_data <- drive_get("zotero_data") %>% 
-      read_sheet()
+    #zotero_data <- drive_get("zotero_data") %>% 
+    #read_sheet()
+    zotero_data <- as.data.frame(googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1ASqUdjm8A0-mS5BylvtCQBWb2snUHYsfUqXW_JI_V70/edit?usp=sharing"))
     
-    project_data <- drive_get("project_data") %>% 
-      read_sheet()
-    
-    ## Update the choices in the researcher selection dropdown menu
-    updateSelectInput(session, "searchPerson",
-                      choices = c("", sort(unique(project_data$stand_name)))) #Sorts names by alphabetical order
+    #project_data <- drive_get("project_data") %>% 
+    #read_sheet()
+    project_data <- as.data.frame(googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/16v69T6f9hc7dA8XKZTcECsftq5chI90um0AZP0KtDIo/edit?usp=sharing"))
     
     
     ## Process Zotero data to create collaboration network
@@ -123,6 +134,7 @@ server <- function(input, output, session) {
              borderWidth = ifelse(is_tpm, 3, 1), # Increased border for TPM members
              organization = ifelse(is.na(organization), "Unknown", organization),
              department = ifelse(is.na(department), "Unknown", department),
+             person = ifelse(is_tpm, author_std, "External Collaborator"),
              title = sprintf("<p><b>%s</b><br>Institution: %s<br>Department: %s<br>Collaborations: %d<br>Status: %s</p>",
                              author_std, 
                              organization,
@@ -211,67 +223,16 @@ server <- function(input, output, session) {
       visLegend(addNodes = legend_data, 
                 useGroups = FALSE) %>%
       
-      #visEvents(click = "function(nodes) {if (nodes.nodes.length > 0) {
-       #   this.fit({
-       #     nodes: [nodes.nodes[0]],
-       #     animation: true
-       #   });
-       # }
-      #}")
-      
-      visEvents(
-        selectNode = "function(nodes) {
-        // Check if a node is selected
-        if (nodes.nodes.length > 0) {
-          var selectedNode = nodes.nodes[0];
-          
-          // Log the selected node to the browser console
-          console.log('Selected node:', selectedNode);
-          
-          // Attempt to update Shiny input
-          Shiny.setInputValue('searchPerson', selectedNode);
+      visEvents(click = "function(nodes) {if (nodes.nodes.length > 0) {
+          this.fit({
+            nodes: [nodes.nodes[0]],
+            animation: true
+          });
         }
-      },
-        // Add a click event for additional debugging
-        click = function(params) {
-        console.log('Click event:', params);
-      }"
-      )
+      }")
   })
   
-  # Observe the searchPerson input and trigger node selection
-  observeEvent(input$searchPerson, {
-    # Log the selected person to R console
-    print(paste("Selected person:", input$searchPerson))
-    
-    # Use shinyjs to run JavaScript
-    js <- sprintf("
-    var network = document.getElementById('network').network;
-    var nodeId = '%s';
-    console.log('Trying to select node:', nodeId);
-    
-    // Check if the node exists
-    var nodeExists = network.body.data.nodes.get({
-      filter: function(node) {
-        return node.id === nodeId;
-      }
-    });
-    
-    if (nodeExists.length > 0) {
-      network.selectNodes([nodeId], true);
-      network.fit({
-        nodes: [nodeId],
-        animation: true
-      });
-      console.log('Node selected successfully');
-    } else {
-      console.log('Node not found:', nodeId);
-    }
-  ", input$searchPerson)
-    
-    runjs(js)
-  }, ignoreNULL = TRUE)
-  
+ 
   # Network summary Tabs
   # Overall Summary Statistics
   output$networkSummaryStats <- renderUI({
