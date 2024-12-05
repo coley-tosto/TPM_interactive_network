@@ -13,7 +13,7 @@ library(googlesheets4)
 # UI Definition
 ui <- fluidPage(
   
-  titlePanel("Research Collaboration Network"),
+  titlePanel("Research Collaboration Network for Te Pūnaha Matatini"),
   
   sidebarLayout(
     sidebarPanel(
@@ -40,7 +40,7 @@ ui <- fluidPage(
                   min = 1, max = 10, value = 2, step = 1),
       
       # Show external collaborators toggle
-      checkboxInput("showExternal", "Show External Collaborators", TRUE),
+      checkboxInput("showExternal", "Show External Collaborators", FALSE),
       
       width = 3
       
@@ -57,7 +57,9 @@ ui <- fluidPage(
                       tabPanel("Publication Types",
                                htmlOutput("publicationStats")),
                       tabPanel("Researchers",
-                               htmlOutput("researcherStats")))
+                               htmlOutput("researcherStats")),
+                      tabPanel("Appearance in Policy",
+                               htmlOutput("overtonStats")))
       ),
       
       width = 9)
