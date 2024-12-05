@@ -2,14 +2,14 @@
 #shiny_token <- googlesheets4::gs4_auth() # authenticate w/ your desired Google identity here
 #saveRDS(shiny_token, "shiny_app_token.rds")
 # 
-# googlesheets4::gs4_auth(
-#  email = "nicole.tosto@gmail.com",
-#  path = NULL,
-#  scopes = "https://www.googleapis.com/auth/spreadsheets",
-#  cache = gargle::gargle_oauth_cache(),
-#  use_oob = TRUE,
-#  token = "shiny_app_token.rds"
-# )
+ googlesheets4::gs4_auth(
+  email = "nicole.tosto@gmail.com",
+  path = NULL,
+  scopes = "https://www.googleapis.com/auth/spreadsheets",
+  cache = gargle::gargle_oauth_cache(),
+  use_oob = TRUE,
+  token = "shiny_app_token.rds"
+ )
 
 # Function to standardize author names from Zotero formatting
 standardize_name <- function(name) {
@@ -46,7 +46,6 @@ standardize_name <- function(name) {
   
 }
 
-
 # Function to get unique color palette for any number of categories
 get_color_palette <- function(n) {
   
@@ -58,30 +57,41 @@ get_color_palette <- function(n) {
 # Server logic
 server <- function(input, output, session) {
   
+  data_store <- reactiveValues(collaboration_data = NULL,
+                               overton_authors = NULL,
+                               overton_keywords = NULL)
+  
   network_data <- reactiveVal()
     
   # Load and process the data
   observe({
     
-    ##Read in the Zotero data and the project data from a google drive location
-    #zotero_data <- drive_get("zotero_data") %>% 
-    #read_sheet()
-    zotero_data <- as.data.frame(googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1ASqUdjm8A0-mS5BylvtCQBWb2snUHYsfUqXW_JI_V70/edit?usp=sharing"))
+    ## Read in the chosen "collaboration" dataset and the TPM metadata from a google drive location
+    ## Currently using Scopus as the "collaboration" data
+    ##Storing the Scopus data for use later on
+    collaboration_data <- as.data.frame(read_sheet("https://docs.google.com/spreadsheets/d/1Fhy4H1UnlGDqO6TaKH_q89_fvYsyINNgp7bDViPUV2I/edit?usp=sharing"))
+    data_store$collaboration_data <- collaboration_data
     
-    #project_data <- drive_get("project_data") %>% 
-    #read_sheet()
-    project_data <- as.data.frame(googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/16v69T6f9hc7dA8XKZTcECsftq5chI90um0AZP0KtDIo/edit?usp=sharing"))
+    metadata <- as.data.frame(read_sheet("https://docs.google.com/spreadsheets/d/16v69T6f9hc7dA8XKZTcECsftq5chI90um0AZP0KtDIo/edit?usp=sharing"))
     
+    ## Filter by year if the Year column exists
     
-    ## Process Zotero data to create collaboration network
-    collaborations <- zotero_data %>%
+    if("Year" %in% colnames(collaboration_data)) {
+      
+      collaboration_data <- collaboration_data %>%
+        filter(Year >= input$yearRange[1] & Year <= input$yearRange[2])
+      
+    }
+    
+    ## Process the Scopus data to create the collaboration network
+    collaborations <- collaboration_data %>%
       
       # Pulling out unique authors based on the separator ";"
-      mutate(authors = strsplit(authors, ";")) %>%
-      unnest(authors) %>%
+      mutate(Authors = strsplit(Authors, ";")) %>%
+      unnest(Authors) %>%
       
       # Using the "standardize_name" function to ensure names have same format
-      mutate(author_std = sapply(authors, standardize_name)) %>%
+      mutate(author_std = sapply(Authors, standardize_name)) %>%
       group_by(author_std) %>%
       
       # Counts the number of collaborations for each author 
@@ -89,15 +99,15 @@ server <- function(input, output, session) {
     
     
     ## Create edges from co-authorship
-    edges <- zotero_data %>%
+    edges <- collaboration_data %>%
       
       # Splitting authors and standardizing names
-      mutate(authors = strsplit(authors, ";")) %>%
-      unnest(authors) %>%
-      mutate(author_std = sapply(authors, standardize_name)) %>%
+      mutate(Authors = strsplit(Authors, ";")) %>%
+      unnest(Authors) %>%
+      mutate(author_std = sapply(Authors, standardize_name)) %>%
       
       # First count number of authors per publication
-      group_by(Key) %>%
+      group_by(EID) %>%
       mutate(n_authors = n()) %>%
       
       # Only create pairs for publications with 2 or more authors
@@ -114,16 +124,16 @@ server <- function(input, output, session) {
                 .groups = 'drop')
 
     
-    ## Create nodes with project information
+    ## Create nodes with TPM metadata
     nodes <- collaborations %>%
       
       # Add a column to the dataset which states whether or not the person is 
       # a part of the TPM group
-      mutate(is_tpm = author_std %in% project_data$stand_name) %>%
+      mutate(is_tpm = author_std %in% metadata$stand_name) %>%
       
       # Combine collaboration data with the TPM metadata
       # IF author is not in TPM, an "NA" is substituted
-      left_join(project_data, by = c("author_std" = "stand_name")) %>%
+      left_join(metadata, by = c("author_std" = "stand_name")) %>%
       
       # Create a bunch of columns for the visual components of the network
       mutate(id = author_std,
