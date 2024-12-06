@@ -77,15 +77,15 @@ server <- function(input, output, session) {
     metadata <- read.csv(url('https://raw.githubusercontent.com/coley-tosto/TPM_interactive_network/refs/heads/main/data/project_data.csv'),
                          header=FALSE, 
                          stringsAsFactors=FALSE, fileEncoding="latin1")
-    
+
+    ## IF using the GitHub data run the following two lines, otherwise comment out
     colnames(metadata) <- c("first_name", "last_name", "stand_name", "organization",
                             "department", "TPM_role", "TPM_category", "TPM_inq_com", "TPM_project",
                             "year_joined", "TPM_bio", "ORCID_ID", "Scopus_ID")
-    
     metadata <- metadata[-1, ]
     
-      ## Filter by year if the Year column exists
     
+    ## Filter by year if the Year column exists
     if("Year" %in% colnames(collaboration_data)) {
       
       collaboration_data <- collaboration_data %>%
@@ -154,7 +154,7 @@ server <- function(input, output, session) {
              borderWidth = ifelse(is_tpm, 3, 1), # Increased border for TPM members
              organization = ifelse(is.na(organization), "Unknown", organization),
              department = ifelse(is.na(department), "Unknown", department),
-             person = ifelse(is_tpm, author_std, "External Collaborator"),
+             person = ifelse(is_tpm, author_std, "External Collaborator"), # Allows you to "search" for specific person
              title = sprintf("<p><b>%s</b><br>Institution: %s<br>Department: %s<br>Collaborations: %d<br>Status: %s</p>",
                              author_std, 
                              organization,
@@ -163,19 +163,19 @@ server <- function(input, output, session) {
                              ifelse(is_tpm, "TPM Member", "External Collaborator"))
              )
     
-    # Store processed network data
+    ## Store processed network data
     network_data(list(nodes = nodes, edges = edges))
     
-    #Read-in the the Overton data generated from a list of "authors"
-    #Filter to keep only unique instances (by "Matched DOI")
+    ## Read-in the the Overton data generated from a list of "authors"
+    ## Filter to keep only unique instances (by "Matched DOI")
     #overton_authors <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1L5ed2LgBde8cp7fjUPkM71SewzZMAL5A6b3q1c7NvOg/edit?usp=sharing')) %>%
       #distinct(`Matched DOI`, .keep_all = TRUE)
     
     overton_authors <- read.csv(url('https://raw.githubusercontent.com/coley-tosto/TPM_interactive_network/refs/heads/main/data/overton_authors.csv')) %>% 
       distinct(Matched.DOI, .keep_all = TRUE)
     
-    #Read-in the Overton data generated with a keyword search
-    #Filter to keep only unique instances (by "Policy Document ID")
+    ## Read-in the Overton data generated with a keyword search
+    ## Filter to keep only unique instances (by "Policy Document ID")
     #overton_keywords <- as.data.frame(read_sheet('https://docs.google.com/spreadsheets/d/1oUdaN45vFKcvvoJ7BOWerAYaYasjTCmbbUiAgmVEI_k/edit?usp=sharing',
       #                                           sheet = "Matched references")) %>% 
       #distinct(`Policy Document ID`, .keep_all = TRUE)
@@ -313,7 +313,9 @@ server <- function(input, output, session) {
     tpm_avg_degree <- mean(tpm_degrees)
     
     ## Paste summary statistics
-    HTML(paste("<div style='padding: 15px; font-size: 16px;'>",
+    HTML(paste("<div style='padding: 15px; font-size: 18px;'>",
+               "<p style='font-size: 18px;'>This section contains statistics pulled from the generated network including the number of reasearchers (i.e., the number of nodes), how many collaborations exist (i.e., the number of edges), and the average degree (which gives an idea of how many collaborations a researcher has on average).</p>",
+               
                "<h3 style='font-size: 24px;'>Researcher Statistics</h3>",
                "<p style='margin-left: 20px;'><strong>Total Researchers:</strong> ", vcount(g), "</p>",
                "<p style='margin-left: 20px;'><strong>TPM Members:</strong> ", nrow(tpm_nodes), "</p>",
@@ -356,7 +358,9 @@ server <- function(input, output, session) {
       # Calculate the TPM-specific average degree
       tpm_degrees <- degree(g)[tpm_nodes$id]
       tpm_avg_degree <- mean(tpm_degrees)
-      HTML(paste("<div style='padding: 15px; font-size: 16px;'>",
+      HTML(paste("<div style='padding: 15px; font-size: 18px;'>",
+                 "<p style='font-size: 18px;'>This section contains statistics pulled from the generated network including the number of reasearchers (i.e., the number of nodes), how many collaborations exist (i.e., the number of edges), and the average degree (which gives an idea of how many collaborations a researcher has on average).</p>",
+                 
                  "<h3 style='font-size: 24px;'>Researcher Statistics</h3>",
                  "<p style='margin-left: 20px;'><strong>TPM Members:</strong> ", nrow(tpm_nodes), "</p>",
 
@@ -396,7 +400,8 @@ server <- function(input, output, session) {
     
     HTML(paste("<div style='padding: 15px;'>",
                "<h3 style='font-size: 24px;'>Publication Types</h3>",
-               "<table class='table' style='width: 50%; margin-top: 15px; font-size: 16px;'>",
+               "<p style='font-size: 18px;'>The table below shows the different output types used to build the collaboration data.</p>",
+               "<table class='table' style='width: 50%; margin-top: 15px; font-size: 18px;'>",
                "<thead><tr><th style='padding: 8px;'>Type</th><th style='padding: 8px; text-align: right;'>Count</th></tr></thead>",
                "<tbody>",
                paste(table_rows, collapse = ""),
@@ -456,6 +461,7 @@ server <- function(input, output, session) {
     
     HTML(paste("<div style='padding: 15px;'>",
                "<h3 style='font-size: 24px;'>Most Connected TPM Researchers</h3>",
+               "<p style='font-size: 18px;'>The table below shows the TPM members with the largest collaboration count for the selected years.</p>",
                "<table class='table' style='width: 50%; margin-top: 15px; font-size: 16px;'>",
                "<thead><tr><th style='padding: 8px;'>Researcher</th><th style='padding: 8px; text-align: right;'>Connections</th></tr></thead>",
                "<tbody>",
@@ -507,7 +513,8 @@ server <- function(input, output, session) {
       
       HTML(paste("<div style='padding: 15px;'>",
                  "<h3 style='font-size: 24px;'>Most Connected TPM Researchers</h3>",
-                 "<table class='table' style='width: 50%; margin-top: 15px; font-size: 16px;'>",
+                 "<p style='font-size: 18px;'>The table below shows the TPM members with the largest collaboration count for the selected years.</p>",
+                 "<table class='table' style='width: 50%; margin-top: 15px; font-size: 18px;'>",
                  "<thead><tr><th style='padding: 8px;'>Researcher</th><th style='padding: 8px; text-align: right;'>Connections</th></tr></thead>",
                  "<tbody>",
                  paste(table_rows, collapse = ""),
@@ -543,8 +550,9 @@ server <- function(input, output, session) {
     ## Create summary of the stats
     HTML(paste("<div style='padding: 15px; font-size: 16px;'>",
                "<h3 style='font-size: 24px;'>Te Pūnaha Matatini's reach in Policy Documents</h3>",
-               "<p style='margin-left: 20px;'><strong>Number of times a TPM Member's work is cited:</strong> ", nrow(overton_authors_stats), "</p>",
-               "<p style='margin-left: 20px;'><strong>Number of times Te Pūnaha Matatini is mentioned:</strong> ", nrow(overton_keywords_stats), "</p>",
+               "<p style='font-size: 18px;'>Overton was used to identify Te Pūnaha Matatini's presence in various policy documents. Two main searchs were conducted, one which highlighted the number of times a TPM member's work was cited in policy documents (generated by searching a list of names), and one that highlighted the number of times Te Pūnaha Matatini was mentioned (generated by searching for keywords). The summary of those outputs are below.</p>",
+               "<p style='margin-left: 20px; font-size: 18px'><strong>Number of times a TPM Member's work is cited:</strong> ", nrow(overton_authors_stats), "</p>",
+               "<p style='margin-left: 20px; font-size: 18px;'><strong>Number of times Te Pūnaha Matatini is mentioned:</strong> ", nrow(overton_keywords_stats), "</p>",
                "</div>")
          )
   })
